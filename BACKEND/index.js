@@ -7,6 +7,10 @@ const Room = require("./models/room");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 
+const http = require("http");
+const { Server } = require("socket.io");
+
+
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -197,8 +201,75 @@ app.post("/join-room", async (req, res) => {
     }
 });
 
+//signaling 
 
-app.listen(PORT, () => {
-    console.log(`I am listening in port ${PORT}`);
+const activeCalls = {}; 
+
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
 });
 
+
+
+
+
+
+io.on("connection", (socket) => {
+    console.log("Socket connected:", socket.id);
+
+    socket.on("join-room", ({ roomId }) => {
+
+        if (!activeCalls[roomId]) {
+            activeCalls[roomId] = [];
+        }
+
+        if (activeCalls[roomId].length >= 2) {
+            socket.emit("room-full");
+            return;
+        }
+
+        activeCalls[roomId].push(socket.id);
+        socket.join(roomId);
+
+        console.log(`Room ${roomId}:`, activeCalls[roomId]);
+
+        if (activeCalls[roomId].length === 2) {
+            // notify first user to create offer
+            io.to(activeCalls[roomId][0]).emit("ready");
+        }
+    });
+
+    socket.on("offer", ({ roomId, offer }) => {
+        socket.to(roomId).emit("offer", offer);
+    });
+
+    socket.on("answer", ({ roomId, answer }) => {
+        socket.to(roomId).emit("answer", answer);
+    });
+
+    socket.on("ice-candidate", ({ roomId, candidate }) => {
+        socket.to(roomId).emit("ice-candidate", candidate);
+    });
+
+    socket.on("disconnect", () => {
+        for (const roomId in activeCalls) {
+            activeCalls[roomId] = activeCalls[roomId].filter(id => id !== socket.id);
+
+            if (activeCalls[roomId].length === 0) {
+                delete activeCalls[roomId];
+            }
+        }
+        console.log("Socket disconnected:", socket.id);
+    });
+});
+
+
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});

@@ -1,4 +1,6 @@
 // pour visibility toggle private/public
+const socket = io("http://localhost:3000");
+let currentRoomId = null;
 
 const toggleOptions = document.querySelectorAll(".visibility-toggle .option");
 const publicSection = document.querySelector(".public");
@@ -162,7 +164,11 @@ const config = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
 };
 
-async function startCall(friendName) {
+
+
+async function startCall(roomId) {
+  currentRoomId = roomId;
+
   homeView.classList.add("hidden");
   meetingView.classList.remove("hidden");
 
@@ -183,8 +189,21 @@ async function startCall(friendName) {
     remoteVideo.srcObject = event.streams[0];
   };
 
-  console.log("Call started with", friendName);
+  peerConnection.onicecandidate = event => {
+    if (event.candidate) {
+      socket.emit("ice-candidate", {
+        roomId: currentRoomId,
+        candidate: event.candidate
+      });
+    }
+  };
+
+  // 🚀 JOIN SIGNALING ROOM
+  socket.emit("join-room", { roomId: currentRoomId });
 }
+
+
+
 
 /* =====================
    MICROPHONE TOGGLE
@@ -236,6 +255,9 @@ leaveBtn.addEventListener("click", () => {
   camBtn.textContent = "Stop Video";
   micBtn.classList.remove("active");
   camBtn.classList.remove("active");
+  socket.disconnect();
+  socket.connect();
+  currentRoomId = null;
 });
 
 /* =====================
@@ -293,7 +315,7 @@ async function loadRooms() {
     rooms.forEach(room => {
       const div = document.createElement("div");
       div.classList.add("friend-card");
-      div.dataset.roomId = room.id;
+      div.dataset.roomId = room.roomId;
       div.dataset.roomName = room.name.toLowerCase();
       div.dataset.roomType = room.type.toLowerCase(); 
       div.innerHTML = `
@@ -308,7 +330,9 @@ async function loadRooms() {
           <span class="tag">${room.type}</span>
         </div>
       `;
-      div.addEventListener("click", () => startCall(room.name));
+      div.addEventListener("click", () => {
+        startCall(room.roomId);
+      });
       roomsList.appendChild(div);
     });
 
@@ -347,7 +371,7 @@ joinRoomBtn.addEventListener("click", async () => {
     localStorage.setItem("currentRoom", JSON.stringify(result.room));
 
     // ✅ démarre directement la room
-    startCall(result.room.name);
+    startCall(result.room.roomId);
 
   } catch (err) {
     console.error(err);
@@ -391,3 +415,38 @@ searchInput.addEventListener("input", () => {
   });
 });
 
+
+socket.on("ready", async () => {
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+
+  socket.emit("offer", {
+    roomId: currentRoomId,
+    offer
+  });
+});
+
+socket.on("offer", async (offer) => {
+  await peerConnection.setRemoteDescription(offer);
+
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+
+  socket.emit("answer", {
+    roomId: currentRoomId,
+    answer
+  });
+});
+
+socket.on("answer", async (answer) => {
+  await peerConnection.setRemoteDescription(answer);
+});
+
+socket.on("ice-candidate", async (candidate) => {
+  await peerConnection.addIceCandidate(candidate);
+});
+
+socket.on("room-full", () => {
+  alert("This room already has 2 users.");
+  leaveBtn.click();
+});
