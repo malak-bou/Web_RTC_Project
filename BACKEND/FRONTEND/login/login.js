@@ -22,7 +22,6 @@ form.addEventListener("submit", async (e) => {
     const result = await res.json();
 
     if (res.ok) {
-      alert("Login successful!");
       // Stocke le token pour les prochaines requêtes
       localStorage.setItem("token", result.token);
       localStorage.setItem("userName", result.user.name);
@@ -30,12 +29,11 @@ form.addEventListener("submit", async (e) => {
       // Redirige vers dashboard ou page principale
       window.location.href = "../app/app.html";
     } else {
-      alert(result.message); // Affiche l'erreur du backend
+      console.log(result.message); // Affiche l'erreur du backend
     }
 
   } catch (err) {
     console.error("Error during login:", err);
-    alert("Server error. Try again later.");
   }
 });
 

@@ -92,7 +92,6 @@ createRoomForm.addEventListener("submit", async e => {
     const result = await res.json();
 
     if (res.ok) {
-      alert("Room created successfully!");
       if (roomStatus === "private") {
         alert(`Share this room ID with a friend: ${result.roomId}`);
       }
@@ -102,11 +101,10 @@ createRoomForm.addEventListener("submit", async e => {
       // Rafraîchir la liste des rooms
       loadRooms();
     } else {
-      alert(result.message);
+      console.log(result.message);
     }
   } catch (err) {
     console.error(err);
-    alert("Server error while creating room");
   }
 });
 
@@ -118,16 +116,36 @@ const profileDropdown = document.getElementById("profileDropdown");
 const logoutBtn = document.getElementById("logoutBtn");
 const userNameEl = document.getElementById("userName");
 
-// Example user
-let user = JSON.parse(localStorage.getItem("user"));
-if (!user) {
-  user = { username: "Alice" };
-  localStorage.setItem("user", JSON.stringify(user));
-}
 
-// Fill avatar and dropdown info
-profileAvatar.textContent = user.username.charAt(0).toUpperCase();
-userNameEl.textContent = user.username;
+async function loadUserProfile() {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  try {
+    const apiUrl = window.location.origin;
+
+    const res = await fetch(`${apiUrl}/profile`, {
+      headers: {
+        "Authorization": "Bearer " + token
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error("Unauthorized");
+    }
+
+    const data = await res.json();
+    const user = data.user;
+
+    // Fill avatar + name
+    profileAvatar.textContent = user.name.charAt(0).toUpperCase();
+    userNameEl.textContent = user.name;
+
+  } catch (err) {
+    console.error("Failed to load profile:", err);
+  }
+}
+loadUserProfile();
 
 // Toggle dropdown
 profileAvatar.addEventListener("click", () => {
@@ -166,7 +184,6 @@ socket.on("disconnect", () => {
 
 socket.on("connect_error", (error) => {
   console.error("❌ Socket.io connection error:", error);
-  alert("Cannot connect to server. Make sure the server is running and accessible.");
 });
 
 let currentRoomId = null;
@@ -234,7 +251,6 @@ async function startCall(roomId, roomType = null) {
     console.log("Connection state:", peerConnection.connectionState);
     if (peerConnection.connectionState === "failed") {
       console.error("WebRTC connection failed - check firewall/NAT settings");
-      alert("Connection failed. Make sure both users are connected to the same server.");
     } else if (peerConnection.connectionState === "connected") {
       console.log("✅ WebRTC connection established!");
     }
@@ -437,7 +453,6 @@ async function loadRooms() {
 
   } catch (err) {
     console.error(err);
-    alert("Error loading rooms");
   }
 }
 
@@ -446,7 +461,7 @@ loadRooms();
 
 joinRoomBtn.addEventListener("click", async () => {
   const roomId = document.getElementById("roomCodeInput").value.trim();
-  if (!roomId) return alert("Enter a room ID");
+  
 
   const token = localStorage.getItem("token");
 
@@ -464,7 +479,7 @@ joinRoomBtn.addEventListener("click", async () => {
     const result = await res.json();
 
     if (!res.ok) {
-      return alert(result.message);
+      return console.log(result.message);
     }
 
     // ✅ stocke la room jointe
@@ -475,7 +490,6 @@ joinRoomBtn.addEventListener("click", async () => {
 
   } catch (err) {
     console.error(err);
-    alert("Server error while joining room");
   }
 });
 
@@ -567,7 +581,6 @@ socket.on("ice-candidate", async (candidate) => {
 });
 
 socket.on("room-full", () => {
-  alert("This room already has 2 users.");
   leaveBtn.click();
 });
 
@@ -663,7 +676,6 @@ screenShareBtn?.addEventListener("click", async () => {
     }
   } catch (error) {
     console.error("Error sharing screen:", error);
-    alert("Failed to share screen. Please try again.");
   }
 });
 
@@ -982,7 +994,7 @@ function initSnake() {
     </div>
   `;
   // Simple snake game implementation would go here
-  alert("Snake game - Coming soon! Use arrow keys when implemented.");
+  console.log("Snake game - Coming soon! Use arrow keys when implemented.");
 }
 
 function initPong() {
@@ -994,5 +1006,5 @@ function initPong() {
     <canvas class="pong-canvas" width="600" height="400" id="pongCanvas"></canvas>
   `;
   // Simple pong game implementation would go here
-  alert("Pong game - Coming soon! Use W/S keys when implemented.");
+  console.log("Pong game - Coming soon! Use W/S keys when implemented.");
 }

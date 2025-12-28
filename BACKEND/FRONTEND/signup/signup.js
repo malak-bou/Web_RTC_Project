@@ -24,7 +24,6 @@ form.addEventListener("submit", async (e) => {
     const result = await res.json();
 
     if (res.ok) {
-      alert("Account created successfully!");
       // stocker le token si tu veux garder l'utilisateur connecté
       localStorage.setItem("token", result.token);
       window.location.href = "../login/login.html"; // redirection vers login
