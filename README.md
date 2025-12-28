@@ -473,39 +473,7 @@ graph TD
     style B fill:#e74c3c
 ```
 
-### WebRTC Signaling Flow
 
-```mermaid
-sequenceDiagram
-    participant A as Client A
-    participant S as Signaling Server
-    participant B as Client B
-
-    A->>S: join-room { roomId }
-    Note over S: Room: [socketA]
-    S-->>A: player-assign { symbol: "X" }
-
-    B->>S: join-room { roomId }
-    Note over S: Room: [socketA, socketB]
-    S-->>B: player-assign { symbol: "O" }
-    S->>A: ready
-
-    A->>A: createOffer()
-    A->>S: offer { roomId, offer }
-    S->>B: offer
-    B->>B: setRemoteDescription(offer)
-    B->>B: createAnswer()
-    B->>S: answer { roomId, answer }
-    S->>A: answer
-    A->>A: setRemoteDescription(answer)
-
-    A->>S: ice-candidate { roomId, candidate }
-    S->>B: ice-candidate { candidate }
-    B->>S: ice-candidate { roomId, candidate }
-    S->>A: ice-candidate { candidate }
-
-    A<-->B: Media Stream (UDP)
-```
 
 ### Room Lifecycle
 
