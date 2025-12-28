@@ -541,6 +541,16 @@ Build-it/
 - **MongoDB**: Local instance or MongoDB Atlas account
 - **npm**: Node package manager
 - **Modern Browser**: Chrome, Firefox, Edge, or Safari (WebRTC support required)
+-**Docker**: should be opened
+
+### Installation Steps
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/malak-bou/Web_RTC_Project.git
+   cd Build-it
+   ```
 
 ### Environment Variables
 
@@ -548,161 +558,12 @@ Create a `.env` file in the `BACKEND` directory:
 
 ```env
 PORT=3000
-MONGO_URI=mongodb://localhost:27017/webrtc-app
-JWT_SECRET=your-secret-key-here
+MONGO_URI=mongodb://mongo:27017/webrtc-app
+JWT_SECRET=malakssecret565
 ```
-
-**Important**: Replace `JWT_SECRET` with a strong, random secret key for production.
-
-### Installation Steps
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone <repository-url>
-   cd Build-it
-   ```
-
-2. **Install backend dependencies:**
-
-   ```bash
-   cd BACKEND
-   npm install
-   ```
-
-3. **Set up MongoDB:**
-
-   - Install MongoDB locally, or
-   - Create a MongoDB Atlas account and update `MONGO_URI` in `.env`
-
-4. **Configure TURN server (optional):**
-
-   - The application uses Metered.live TURN service
-   - API key is hardcoded in `index.js` (line 316)
-   - For production, move API key to environment variables
-
-5. **Start the server:**
-
-   ```bash
-   npm start
-   # Or for development with auto-reload:
-   npm run dev
-   ```
-
-6. **Access the application:**
-   - Open browser to `http://localhost:3000`
-   - The Express server serves the frontend from `FRONTEND` directory
-
-## Running the Application
-
-### Development Mode
-
+ ### Docker commande
 ```bash
-cd BACKEND
-npm run dev  # Uses nodemon for auto-reload
+docker-compose up --build
 ```
 
-### Production Mode
-
-```bash
-cd BACKEND
-npm start
-```
-
-### Using Docker (if configured)
-
-```bash
-docker-compose up
-```
-
-## How to Test / Demo the App
-
-### Basic Testing Flow
-
-1. **Sign Up:**
-
-   - Navigate to signup page
-   - Create a new account (name, email, password)
-   - Receive JWT token (stored in localStorage)
-
-2. **Sign In:**
-
-   - Use existing credentials
-   - Token stored for API authentication
-
-3. **Create a Room:**
-
-   - Click "+ Add room" button
-   - Enter room name
-   - Select room type (game, business, coding, learning, language)
-   - Choose status (public or private)
-   - If private, note the generated `roomId`
-
-4. **Join a Room:**
-
-   - **Public Room**: Click on room card in the list
-   - **Private Room**: Switch to "Join Private Room" tab, enter room ID
-
-5. **Establish Connection:**
-
-   - Allow camera/microphone permissions
-   - Wait for second user to join
-   - Connection establishes automatically
-   - Remote video appears when connected
-
-6. **Test Features:**
-   - **Mute/Unmute**: Click microphone button
-   - **Video Toggle**: Click camera button
-   - **Screen Share**: Click screen share button, select screen/window
-   - **Chat**: Click chat button, send messages
-   - **Games**: In game-type rooms, click games button, select Tic-Tac-Toe
-
-### Testing with Two Users
-
-**Option 1: Two Browser Windows**
-
-- Open application in two different browser windows
-- Use different accounts or same account
-- Join the same room from both windows
-
-**Option 2: Two Devices**
-
-- Run server on local network
-- Access from two devices using server's IP address
-- Join same room
-
-**Option 3: Incognito/Private Windows**
-
-- Open normal window and incognito window
-- Use different accounts
-- Test connection between them
-
-### Expected Behavior
-
-- **Room Full**: If third user tries to join, receives "room-full" event
-- **Connection States**: Monitor browser console for connection state changes
-- **ICE Candidates**: Console logs show candidate exchange
-- **Media Streams**: Local video shows immediately, remote video appears after connection
-
-### Debugging
-
-**Browser Console:**
-
-- Check for WebRTC connection state logs
-- Monitor Socket.IO connection status
-- View ICE candidate exchange
-- Check for errors
-
-**Server Console:**
-
-- Socket connection/disconnection logs
-- Room join events
-- Signaling message routing
-
-**Common Issues:**
-
-- **No video**: Check camera permissions, firewall settings
-- **Connection failed**: May need TURN server (check NAT type)
-- **Room full**: Maximum 2 users enforced
-- **Signaling errors**: Check Socket.IO connection, server running
 
