@@ -565,5 +565,9 @@ JWT_SECRET=malakssecret565
 ```bash
 docker-compose up --build
 ```
-
+ ### Visit  "Portal" Application  
+```
+Application is deployed via render 
+https://web-rtc-mg24.onrender.com/
+```
 
