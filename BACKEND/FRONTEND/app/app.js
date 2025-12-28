@@ -1,6 +1,3 @@
-// pour visibility toggle private/public
-const socket = io("http://localhost:3000");
-let currentRoomId = null;
 
 const toggleOptions = document.querySelectorAll(".visibility-toggle .option");
 const publicSection = document.querySelector(".public");
@@ -70,7 +67,8 @@ createRoomForm.addEventListener("submit", async e => {
   const token = localStorage.getItem("token"); // récupère le token du login
 
   try {
-    const res = await fetch("http://localhost:3000/rooms", {
+    const apiUrl = window.location.origin;
+    const res = await fetch(`${apiUrl}/rooms`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -142,6 +140,24 @@ document.addEventListener("click", (e) => {
 });
 
 
+// pour visibility toggle private/public
+const socket = io(window.location.origin);
+
+// Socket.io connection monitoring for debugging
+socket.on("connect", () => {
+  console.log("✅ Connected to signaling server:", window.location.origin);
+});
+
+socket.on("disconnect", () => {
+  console.warn("⚠️ Disconnected from signaling server");
+});
+
+socket.on("connect_error", (error) => {
+  console.error("❌ Socket.io connection error:", error);
+  alert("Cannot connect to server. Make sure the server is running and accessible.");
+});
+
+let currentRoomId = null;
 
 
 const homeView = document.getElementById("homeView");
@@ -160,9 +176,11 @@ let peerConnection;
 let micEnabled = true;
 let camEnabled = true;
 
-const config = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-};
+async function getRTCConfig() {
+  const res = await fetch("/webrtc/ice");
+  const iceServers = await res.json();
+  return { iceServers };
+}
 
 
 
@@ -179,26 +197,55 @@ async function startCall(roomId) {
 
   localVideo.srcObject = localStream;
 
-  peerConnection = new RTCPeerConnection(config);
+  const rtcConfig = await getRTCConfig();
+  peerConnection = new RTCPeerConnection(rtcConfig);
+
+  // Connection state monitoring for debugging
+  peerConnection.onconnectionstatechange = () => {
+    console.log("Connection state:", peerConnection.connectionState);
+    if (peerConnection.connectionState === "failed") {
+      console.error("WebRTC connection failed - check firewall/NAT settings");
+      alert("Connection failed. Make sure both users are connected to the same server.");
+    } else if (peerConnection.connectionState === "connected") {
+      console.log("✅ WebRTC connection established!");
+    }
+  };
+
+  peerConnection.oniceconnectionstatechange = () => {
+    console.log("ICE connection state:", peerConnection.iceConnectionState);
+    if (peerConnection.iceConnectionState === "failed") {
+      console.error("ICE connection failed - TURN server may be needed");
+    }
+  };
 
   localStream.getTracks().forEach(track => {
     peerConnection.addTrack(track, localStream);
   });
 
   peerConnection.ontrack = event => {
+    console.log("✅ Received remote stream");
     remoteVideo.srcObject = event.streams[0];
   };
 
   peerConnection.onicecandidate = event => {
     if (event.candidate) {
+      console.log("Sending ICE candidate");
       socket.emit("ice-candidate", {
         roomId: currentRoomId,
         candidate: event.candidate
       });
+    } else {
+      console.log("ICE gathering complete");
     }
   };
 
+  // Error handling
+  peerConnection.onerror = (error) => {
+    console.error("PeerConnection error:", error);
+  };
+
   // 🚀 JOIN SIGNALING ROOM
+  console.log("Joining room:", currentRoomId);
   socket.emit("join-room", { roomId: currentRoomId });
 }
 
@@ -302,7 +349,8 @@ async function loadRooms() {
   const token = localStorage.getItem("token");
 
   try {
-    const res = await fetch("http://localhost:3000/rooms", {
+    const apiUrl = window.location.origin;
+    const res = await fetch(`${apiUrl}/rooms`, {
       headers: {
         "Authorization": "Bearer " + token
       }
@@ -317,7 +365,7 @@ async function loadRooms() {
       div.classList.add("friend-card");
       div.dataset.roomId = room.roomId;
       div.dataset.roomName = room.name.toLowerCase();
-      div.dataset.roomType = room.type.toLowerCase(); 
+      div.dataset.roomType = room.type.toLowerCase();
       div.innerHTML = `
         <div class="top">
           <div class="avatar">${room.name[0].toUpperCase()}</div>
@@ -352,7 +400,8 @@ joinRoomBtn.addEventListener("click", async () => {
   const token = localStorage.getItem("token");
 
   try {
-    const res = await fetch("http://localhost:3000/join-room", {
+    const apiUrl = window.location.origin;
+    const res = await fetch(`${apiUrl}/join-room`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -404,10 +453,10 @@ searchInput.addEventListener("input", () => {
   const activeFilter = document.querySelector(".filter-chip.active").dataset.type.toLowerCase();
 
   document.querySelectorAll(".friend-card").forEach(card => {
-  
-  const matchSearch = card.dataset.roomName.includes(query) || 
-                        card.dataset.roomType.includes(query) || 
-                        card.dataset.roomId.includes(query);
+
+    const matchSearch = card.dataset.roomName.includes(query) ||
+      card.dataset.roomType.includes(query) ||
+      card.dataset.roomId.includes(query);
 
     const matchFilter = (activeFilter === "all" || card.dataset.roomType === activeFilter);
 
@@ -417,25 +466,37 @@ searchInput.addEventListener("input", () => {
 
 
 socket.on("ready", async () => {
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
+  console.log("✅ Ready to create offer - second user joined");
+  try {
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    console.log("Sending offer");
 
-  socket.emit("offer", {
-    roomId: currentRoomId,
-    offer
-  });
+    socket.emit("offer", {
+      roomId: currentRoomId,
+      offer
+    });
+  } catch (error) {
+    console.error("Error creating offer:", error);
+  }
 });
 
 socket.on("offer", async (offer) => {
-  await peerConnection.setRemoteDescription(offer);
+  console.log("✅ Received offer, creating answer");
+  try {
+    await peerConnection.setRemoteDescription(offer);
 
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    console.log("Sending answer");
 
-  socket.emit("answer", {
-    roomId: currentRoomId,
-    answer
-  });
+    socket.emit("answer", {
+      roomId: currentRoomId,
+      answer
+    });
+  } catch (error) {
+    console.error("Error handling offer:", error);
+  }
 });
 
 socket.on("answer", async (answer) => {
@@ -443,7 +504,14 @@ socket.on("answer", async (answer) => {
 });
 
 socket.on("ice-candidate", async (candidate) => {
-  await peerConnection.addIceCandidate(candidate);
+  try {
+    if (candidate) {
+      await peerConnection.addIceCandidate(candidate);
+      console.log("Added ICE candidate");
+    }
+  } catch (error) {
+    console.error("Error adding ICE candidate:", error);
+  }
 });
 
 socket.on("room-full", () => {

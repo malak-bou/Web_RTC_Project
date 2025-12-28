@@ -6,6 +6,7 @@ const User = require("./models/user");
 const Room = require("./models/room");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
+const cors = require("cors");
 
 const http = require("http");
 const { Server } = require("socket.io");
@@ -14,6 +15,19 @@ const { Server } = require("socket.io");
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    console.error("ERROR: JWT_SECRET environment variable is not set!");
+    process.exit(1);
+}
+
+// CORS configuration
+app.use(cors({
+    origin: "*", // Allow all origins in production, or specify your Render frontend URL
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json())
 
 connectDB();
@@ -83,12 +97,12 @@ app.post("/signin", async (req, res) => {
         res.status(200).json({
             message: "signin successful", token,
             user: { name: user.name, email: user.email }
-        })
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
     }
-})
+});
 
 
 //profile
@@ -219,7 +233,6 @@ const io = new Server(server, {
 
 
 
-
 io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
@@ -268,6 +281,23 @@ io.on("connection", (socket) => {
         console.log("Socket disconnected:", socket.id);
     });
 });
+
+// api de reseaux turn
+
+
+app.get("/webrtc/ice", async (req, res) => {
+  try {
+    const response = await fetch(
+        "https://portal-connect.metered.live/api/v1/turn/credentials?apiKey=01fb9801f30aa47373b0c96af832b08072dc"
+    );
+
+    const iceServers = await response.json();
+    res.json(iceServers);
+  } catch (err) {
+    res.status(500).json({ message: "ICE error" });
+  }
+});
+
 
 
 server.listen(PORT, () => {
