@@ -247,10 +247,17 @@ io.on("connection", (socket) => {
             return;
         }
 
+        const isFirstPlayer = activeCalls[roomId].length === 0;
         activeCalls[roomId].push(socket.id);
         socket.join(roomId);
 
         console.log(`Room ${roomId}:`, activeCalls[roomId]);
+
+        // Assign player role: first player = X, second player = O
+        socket.emit("player-assign", { 
+            symbol: isFirstPlayer ? "X" : "O",
+            isPlayer1: isFirstPlayer
+        });
 
         if (activeCalls[roomId].length === 2) {
             // notify first user to create offer
@@ -279,6 +286,24 @@ io.on("connection", (socket) => {
             }
         }
         console.log("Socket disconnected:", socket.id);
+    });
+
+    // Chat functionality
+    socket.on("chat-message", ({ roomId, message, sender }) => {
+        socket.to(roomId).emit("chat-message", { message, sender });
+    });
+
+    // Game functionality
+    socket.on("game-select", ({ roomId, gameType }) => {
+        socket.to(roomId).emit("game-select", { gameType });
+    });
+
+    socket.on("game-move", ({ roomId, gameType, moveData }) => {
+        socket.to(roomId).emit("game-move", { gameType, moveData });
+    });
+
+    socket.on("game-reset", ({ roomId, gameType }) => {
+        socket.to(roomId).emit("game-reset", { gameType });
     });
 });
 

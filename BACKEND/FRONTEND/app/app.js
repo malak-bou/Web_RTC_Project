@@ -1,7 +1,15 @@
-
+//FINAL FINAL 
 const toggleOptions = document.querySelectorAll(".visibility-toggle .option");
 const publicSection = document.querySelector(".public");
 const privateSection = document.querySelector(".private");
+const chatSidebar = document.getElementById("chatSidebar");
+const toggleChatBtn = document.getElementById("toggleChatBtn");
+const closeChatBtn = document.getElementById("closeChatBtn");
+const chatMessages = document.getElementById("chatMessages");
+const chatInput = document.getElementById("chatInput");
+const sendChatBtn = document.getElementById("sendChatBtn");
+const userName = localStorage.getItem("userName") || "You";
+
 
 toggleOptions.forEach(opt => {
   opt.addEventListener("click", () => {
@@ -143,6 +151,10 @@ document.addEventListener("click", (e) => {
 // pour visibility toggle private/public
 const socket = io(window.location.origin);
 
+// Track if we're player 1 (first to join room)
+let isFirstPlayer = false;
+let playerJoined = false;
+
 // Socket.io connection monitoring for debugging
 socket.on("connect", () => {
   console.log("✅ Connected to signaling server:", window.location.origin);
@@ -158,6 +170,8 @@ socket.on("connect_error", (error) => {
 });
 
 let currentRoomId = null;
+let currentRoomType = null; // Store the current room type
+let mySymbol = null; // "X" or "O" - assigned by server
 
 
 const homeView = document.getElementById("homeView");
@@ -184,11 +198,26 @@ async function getRTCConfig() {
 
 
 
-async function startCall(roomId) {
+async function startCall(roomId, roomType = null) {
   currentRoomId = roomId;
+  currentRoomType = roomType; // Store room type
 
   homeView.classList.add("hidden");
   meetingView.classList.remove("hidden");
+
+  chatSidebar.classList.add("hidden");
+
+  chatMessages.innerHTML = "";
+  chatInput.value = "";
+
+  // Show/hide game button based on room type
+  if (gameBtn) {
+    if (currentRoomType === "game") {
+      gameBtn.style.display = "block";
+    } else {
+      gameBtn.style.display = "none";
+    }
+  }
 
   localStream = await navigator.mediaDevices.getUserMedia({
     video: true,
@@ -246,6 +275,10 @@ async function startCall(roomId) {
 
   // 🚀 JOIN SIGNALING ROOM
   console.log("Joining room:", currentRoomId);
+  if (!playerJoined) {
+    isFirstPlayer = true;
+    playerJoined = true;
+  }
   socket.emit("join-room", { roomId: currentRoomId });
 }
 
@@ -255,24 +288,30 @@ async function startCall(roomId) {
 /* =====================
    MICROPHONE TOGGLE
 ===================== */
-micBtn.addEventListener("click", () => {
+micBtn?.addEventListener("click", () => {
+  if (!localStream) return;
   const audioTrack = localStream.getAudioTracks()[0];
+  if (!audioTrack) return;
+  
   micEnabled = !micEnabled;
   audioTrack.enabled = micEnabled;
 
-  micBtn.textContent = micEnabled ? "Mute" : "Unmute";
+  micBtn.textContent = micEnabled ? "🎤 Mute" : "🎤 Unmute";
   micBtn.classList.toggle("active", !micEnabled);
 });
 
 /* =====================
    CAMERA TOGGLE
 ===================== */
-camBtn.addEventListener("click", () => {
+camBtn?.addEventListener("click", () => {
+  if (!localStream) return;
   const videoTrack = localStream.getVideoTracks()[0];
+  if (!videoTrack) return;
+  
   camEnabled = !camEnabled;
   videoTrack.enabled = camEnabled;
 
-  camBtn.textContent = camEnabled ? "Stop Video" : "Start Video";
+  camBtn.textContent = camEnabled ? "📹 Stop Video" : "📹 Start Video";
   camBtn.classList.toggle("active", !camEnabled);
 });
 
@@ -305,6 +344,18 @@ leaveBtn.addEventListener("click", () => {
   socket.disconnect();
   socket.connect();
   currentRoomId = null;
+  currentRoomType = null;
+  playerJoined = false;
+  isFirstPlayer = false;
+  mySymbol = null;
+  
+  // Close chat and games
+  if (chatSidebar) chatSidebar.classList.add("hidden");
+  if (gameContainer) {
+    gameContainer.classList.add("hidden");
+    gameContainer.innerHTML = "";
+  }
+  currentGame = null;
 });
 
 /* =====================
@@ -379,7 +430,7 @@ async function loadRooms() {
         </div>
       `;
       div.addEventListener("click", () => {
-        startCall(room.roomId);
+        startCall(room.roomId, room.type);
       });
       roomsList.appendChild(div);
     });
@@ -419,8 +470,8 @@ joinRoomBtn.addEventListener("click", async () => {
     // ✅ stocke la room jointe
     localStorage.setItem("currentRoom", JSON.stringify(result.room));
 
-    // ✅ démarre directement la room
-    startCall(result.room.roomId);
+    // ✅ démarre directement la room avec le type
+    startCall(result.room.roomId, result.room.type);
 
   } catch (err) {
     console.error(err);
@@ -467,6 +518,7 @@ searchInput.addEventListener("input", () => {
 
 socket.on("ready", async () => {
   console.log("✅ Ready to create offer - second user joined");
+  isFirstPlayer = true; // First to join becomes player 1
   try {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
@@ -518,3 +570,429 @@ socket.on("room-full", () => {
   alert("This room already has 2 users.");
   leaveBtn.click();
 });
+
+/* =====================
+   CHAT FUNCTIONALITY
+===================== */
+
+
+toggleChatBtn?.addEventListener("click", () => {
+  if (chatSidebar.classList.contains("hidden")) {
+    chatSidebar.classList.remove("hidden");
+  } else {
+    chatSidebar.classList.add("hidden");
+  }
+});
+
+closeChatBtn?.addEventListener("click", () => {
+  chatSidebar.classList.add("hidden");
+});
+
+function addChatMessage(message, sender, isOwn = false) {
+  const messageDiv = document.createElement("div");
+  messageDiv.className = `chat-message ${isOwn ? "own" : "other"}`;
+  messageDiv.innerHTML = `
+    <div class="sender">${sender}</div>
+    <div>${message}</div>
+  `;
+  chatMessages.appendChild(messageDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+sendChatBtn?.addEventListener("click", () => {
+  const message = chatInput.value.trim();
+  if (message && currentRoomId) {
+    socket.emit("chat-message", {
+      roomId: currentRoomId,
+      message,
+      sender: userName
+    });
+    addChatMessage(message, userName, true);
+    chatInput.value = "";
+  }
+});
+
+chatInput?.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    sendChatBtn.click();
+  }
+});
+
+socket.on("chat-message", ({ message, sender }) => {
+  addChatMessage(message, sender, false);
+});
+
+/* =====================
+   SCREEN SHARING
+===================== */
+const screenShareBtn = document.getElementById("screenShareBtn");
+let screenShareStream = null;
+let isScreenSharing = false;
+
+screenShareBtn?.addEventListener("click", async () => {
+  try {
+    if (!isScreenSharing) {
+      // Start screen sharing
+      screenShareStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+
+      // Replace video track in peer connection
+      const videoTrack = screenShareStream.getVideoTracks()[0];
+      const sender = peerConnection.getSenders().find(s => 
+        s.track && s.track.kind === "video"
+      );
+      
+      if (sender) {
+        await sender.replaceTrack(videoTrack);
+      }
+
+      // Show screen share in local video
+      localVideo.srcObject = screenShareStream;
+      isScreenSharing = true;
+      screenShareBtn.textContent = "🖥️ Stop Sharing";
+      screenShareBtn.classList.add("active");
+
+      // Handle when user stops sharing via browser UI
+      videoTrack.onended = () => {
+        stopScreenShare();
+      };
+    } else {
+      stopScreenShare();
+    }
+  } catch (error) {
+    console.error("Error sharing screen:", error);
+    alert("Failed to share screen. Please try again.");
+  }
+});
+
+function stopScreenShare() {
+  if (screenShareStream) {
+    screenShareStream.getTracks().forEach(track => track.stop());
+    screenShareStream = null;
+  }
+
+  // Get back camera stream
+  navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    .then(stream => {
+      const videoTrack = stream.getVideoTracks()[0];
+      const sender = peerConnection.getSenders().find(s => 
+        s.track && s.track.kind === "video"
+      );
+      
+      if (sender) {
+        sender.replaceTrack(videoTrack);
+      }
+
+      localStream = stream;
+      localVideo.srcObject = stream;
+      isScreenSharing = false;
+      screenShareBtn.textContent = "🖥️ Share Screen";
+      screenShareBtn.classList.remove("active");
+    })
+    .catch(error => {
+      console.error("Error getting camera back:", error);
+    });
+}
+
+/* =====================
+   GAMES FUNCTIONALITY
+===================== */
+const gameBtn = document.getElementById("gameBtn");
+const gameModal = document.getElementById("gameModal");
+const cancelGameModal = document.getElementById("cancelGameModal");
+const gameContainer = document.getElementById("gameContainer");
+let currentGame = null;
+let isPlayer1 = false;
+let gameState = {};
+
+socket.on("player-assign", ({ symbol, isPlayer1: assignedIsPlayer1 }) => {
+  mySymbol = symbol; // "X" or "O"
+  isPlayer1 = assignedIsPlayer1; // Update isPlayer1 based on server assignment
+  console.log(`You are assigned as ${symbol} (Player ${isPlayer1 ? 1 : 2})`);
+});
+
+
+gameBtn?.addEventListener("click", () => {
+  // Only allow games in game-type rooms
+  if (currentRoomType !== "game") {
+    alert("Games are only available in Game-type rooms!");
+    return;
+  }
+  gameModal.style.display = "flex";
+});
+
+cancelGameModal?.addEventListener("click", () => {
+  gameModal.style.display = "none";
+});
+
+// Game selection
+document.querySelectorAll(".game-option").forEach(option => {
+  option.addEventListener("click", () => {
+    // Double check room type
+    if (currentRoomType !== "game") {
+      alert("Games are only available in Game-type rooms!");
+      gameModal.style.display = "none";
+      return;
+    }
+    
+    const gameType = option.dataset.game;
+    if (currentRoomId) {
+      socket.emit("game-select", { roomId: currentRoomId, gameType });
+      startGame(gameType);
+      gameModal.style.display = "none";
+    }
+  });
+});
+
+socket.on("game-select", ({ gameType }) => {
+  startGame(gameType);
+  gameModal.style.display = "none";
+});
+
+function startGame(gameType) {
+  // Player role is already assigned by server via "player-assign" event
+  // mySymbol and isPlayer1 are set when joining the room
+
+  gameContainer.classList.remove("hidden");
+  gameContainer.innerHTML = "";
+
+
+
+  const closeBtn = document.createElement("button");
+  closeBtn.textContent = "×";
+  closeBtn.classList.add("close-game-btn");
+  closeBtn.style.position = "absolute";
+  closeBtn.style.top = "10px";
+  closeBtn.style.right = "10px";
+  closeBtn.style.fontSize = "24px";
+  closeBtn.style.cursor = "pointer";
+  closeBtn.addEventListener("click", () => {
+    gameContainer.classList.add("hidden");
+    gameContainer.innerHTML = "";
+    currentGame = null;
+  });
+  gameContainer.appendChild(closeBtn);
+  switch (gameType) {
+    case "tictactoe":
+      initTicTacToe();
+      break;
+    case "snake":
+      initSnake();
+      break;
+    case "pong":
+      initPong();
+      break;
+  }
+  currentGame = gameType;
+}
+
+function initTicTacToe() {
+  // Reset game state
+  gameState = {
+    board: Array(9).fill(""),
+    currentPlayer: "X", // X always starts
+    gameOver: false,
+    winner: null
+  };
+
+  const gameDiv = document.createElement("div");
+  gameDiv.style.display = "flex";
+  gameDiv.style.flexDirection = "column";
+  gameDiv.style.alignItems = "center";
+  gameDiv.style.gap = "20px";
+  
+  const gameInfo = document.createElement("div");
+  gameInfo.className = "game-info";
+  
+  // Update status based on current player and my symbol
+  const statusText = mySymbol 
+    ? `You are ${mySymbol} - ${gameState.currentPlayer === mySymbol ? "Your turn!" : "Waiting for opponent..."}`
+    : "Waiting for player assignment...";
+  
+  gameInfo.innerHTML = `
+    <h2>Tic-Tac-Toe</h2>
+    <div class="game-status" id="gameStatus">${statusText}</div>
+  `;
+
+  const board = document.createElement("div");
+  board.className = "tic-tac-toe";
+  board.style.display = "grid";
+  board.style.gridTemplateColumns = "repeat(3, 100px)";
+  board.style.gridTemplateRows = "repeat(3, 100px)";
+  board.style.gap = "4px";
+  board.style.background = "var(--bg-control)";
+  board.style.padding = "4px";
+  board.style.borderRadius = "8px";
+  
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement("button");
+    cell.className = "ttt-cell";
+    cell.dataset.index = i;
+    cell.style.background = "var(--bg-card)";
+    cell.style.border = "none";
+    cell.style.fontSize = "48px";
+    cell.style.cursor = "pointer";
+    cell.style.display = "flex";
+    cell.style.alignItems = "center";
+    cell.style.justifyContent = "center";
+    cell.style.borderRadius = "4px";
+    cell.style.color = "var(--text-main)";
+    cell.addEventListener("click", () => handleTTTMove(i));
+    board.appendChild(cell);
+  }
+
+  gameDiv.appendChild(gameInfo);
+  gameDiv.appendChild(board);
+  gameContainer.appendChild(gameDiv);
+}
+
+function handleTTTMove(index) {
+  if (gameState.gameOver || gameState.board[index] !== "") {
+    return;
+  }
+
+  // Check if player is assigned
+  if (!mySymbol) {
+    alert("Waiting for player assignment...");
+    return;
+  }
+
+  // Check if it's this player's turn
+  if (gameState.currentPlayer !== mySymbol) {
+    alert(`It's not your turn! Current player: ${gameState.currentPlayer}`);
+    return;
+  }
+
+  // Make the move
+  gameState.board[index] = gameState.currentPlayer;
+  updateTTTBoard();
+
+  // Check for winner
+  const winner = checkTTTWinner();
+  if (winner) {
+    gameState.gameOver = true;
+    gameState.winner = winner;
+    const statusEl = document.getElementById("gameStatus");
+    if (statusEl) {
+      if (winner === "draw") {
+        statusEl.textContent = "It's a draw!";
+      } else if (winner === mySymbol) {
+        statusEl.textContent = "🎉 You win!";
+      } else {
+        statusEl.textContent = `${winner} wins!`;
+      }
+    }
+  } else {
+    // Switch turns
+    gameState.currentPlayer = gameState.currentPlayer === "X" ? "O" : "X";
+    const statusEl = document.getElementById("gameStatus");
+    if (statusEl) {
+      statusEl.textContent = gameState.currentPlayer === mySymbol 
+        ? `Your turn! (You are ${mySymbol})` 
+        : `Waiting for ${gameState.currentPlayer}... (You are ${mySymbol})`;
+    }
+  }
+
+  // Send move to opponent
+  socket.emit("game-move", {
+    roomId: currentRoomId,
+    gameType: "tictactoe",
+    moveData: { 
+      board: [...gameState.board], 
+      currentPlayer: gameState.currentPlayer, 
+      gameOver: gameState.gameOver,
+      winner: gameState.winner || null
+    }
+  });
+}
+
+function updateTTTBoard() {
+  const cells = document.querySelectorAll(".ttt-cell");
+  cells.forEach((cell, index) => {
+    cell.textContent = gameState.board[index];
+    cell.disabled = gameState.board[index] !== "" || gameState.gameOver;
+  });
+}
+
+function checkTTTWinner() {
+  const winPatterns = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  for (const pattern of winPatterns) {
+    const [a, b, c] = pattern;
+    if (gameState.board[a] && gameState.board[a] === gameState.board[b] && 
+        gameState.board[a] === gameState.board[c]) {
+      return gameState.board[a];
+    }
+  }
+
+  if (gameState.board.every(cell => cell !== "")) {
+    return "draw";
+  }
+
+  return null;
+}
+
+socket.on("game-move", ({ gameType, moveData }) => {
+  if (gameType === "tictactoe") {
+    // Update game state from opponent's move
+    gameState.board = [...moveData.board];
+    gameState.currentPlayer = moveData.currentPlayer;
+    gameState.gameOver = moveData.gameOver || false;
+    gameState.winner = moveData.winner || null;
+    
+    // Update the board display
+    updateTTTBoard();
+    
+    // Update status message
+    const statusEl = document.getElementById("gameStatus");
+    if (statusEl && mySymbol) {
+      if (gameState.gameOver) {
+        if (gameState.winner === "draw") {
+          statusEl.textContent = "It's a draw!";
+        } else if (gameState.winner === mySymbol) {
+          statusEl.textContent = "🎉 You win!";
+        } else {
+          statusEl.textContent = `${gameState.winner} wins!`;
+        }
+      } else {
+        // It's either my turn or opponent's turn
+        statusEl.textContent = gameState.currentPlayer === mySymbol 
+          ? `Your turn! (You are ${mySymbol})` 
+          : `Waiting for ${gameState.currentPlayer}... (You are ${mySymbol})`;
+      }
+    }
+  }
+});
+
+function initSnake() {
+  gameContainer.innerHTML = `
+    <div class="game-info">
+      <h2>Snake Game</h2>
+      <div class="game-status">Use arrow keys to play</div>
+    </div>
+    <canvas class="snake-canvas" width="400" height="400" id="snakeCanvas"></canvas>
+    <div class="snake-controls">
+      <button class="snake-btn" onclick="alert('Use arrow keys to control')">How to Play</button>
+    </div>
+  `;
+  // Simple snake game implementation would go here
+  alert("Snake game - Coming soon! Use arrow keys when implemented.");
+}
+
+function initPong() {
+  gameContainer.innerHTML = `
+    <div class="game-info">
+      <h2>Pong</h2>
+      <div class="game-status">Use W/S keys to move your paddle</div>
+    </div>
+    <canvas class="pong-canvas" width="600" height="400" id="pongCanvas"></canvas>
+  `;
+  // Simple pong game implementation would go here
+  alert("Pong game - Coming soon! Use W/S keys when implemented.");
+}

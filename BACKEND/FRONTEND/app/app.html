@@ -106,20 +106,63 @@
 
     <header class="meeting-header">
       <span>Secure Online Call</span>
+      <button id="toggleChatBtn" class="header-btn">💬 Chat</button>
     </header>
 
-    <div class="video-area">
-      <video id="remoteVideo" autoplay playsinline></video>
-      <video id="localVideo" autoplay muted playsinline class="local-video"></video>
+    <div class="meeting-content">
+      <div class="video-area">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <video id="localVideo" autoplay muted playsinline class="local-video"></video>
+        <div id="gameContainer" class="game-container hidden"></div>
+      </div>
+
+      <!-- Chat Sidebar -->
+      <div id="chatSidebar" class="chat-sidebar hidden">
+        <div class="chat-header">
+          <h3>Chat</h3>
+          <button id="closeChatBtn" class="close-btn">×</button>
+        </div>
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-container">
+          <input type="text" id="chatInput" placeholder="Type a message..." />
+          <button id="sendChatBtn" class="send-btn">Send</button>
+        </div>
+      </div>
     </div>
 
     <footer class="controls">
-      <button id="micBtn" class="control-btn">Mute</button>
-      <button id="camBtn" class="control-btn">Stop Video</button>
+      <button id="micBtn" class="control-btn">🎤 Mute</button>
+      <button id="camBtn" class="control-btn">📹 Stop Video</button>
+      <button id="screenShareBtn" class="control-btn">🖥️ Share Screen</button>
+      <button id="gameBtn" class="control-btn" style="display: none;">🎮 Games</button>
       <button id="leaveBtn" class="control-btn danger">Leave</button>
     </footer>
 
   </section>
+
+  <!-- Game Selection Modal -->
+  <div class="modal" id="gameModal">
+    <div class="modal-content">
+      <h2>Choose a Game</h2>
+      <div class="game-options">
+        <div class="game-option" data-game="tictactoe">
+          <h3>❌ Tic-Tac-Toe</h3>
+          <p>Classic 3x3 game</p>
+        </div>
+        <div class="game-option" data-game="snake">
+          <h3>🐍 Snake</h3>
+          <p>Race to grow longer</p>
+        </div>
+        <div class="game-option" data-game="pong">
+          <h3>🏓 Pong</h3>
+          <p>Classic paddle game</p>
+        </div>
+      </div>
+      <div class="modal-buttons">
+        <button type="button" id="cancelGameModal">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="app.js"></script>
