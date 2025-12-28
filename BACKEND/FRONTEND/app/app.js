@@ -1,5 +1,5 @@
 // pour visibility toggle private/public
-const socket = io("https://your-backend.onrender.com");
+const socket = io("https://web-rtc-project-3.onrender.com");
 let currentRoomId = null;
 
 const toggleOptions = document.querySelectorAll(".visibility-toggle .option");
@@ -70,7 +70,7 @@ createRoomForm.addEventListener("submit", async e => {
   const token = localStorage.getItem("token"); // récupère le token du login
 
   try {
-    const res = await fetch("https://your-backend.onrender.com/rooms", {
+    const res = await fetch("https://web-rtc-project-3.onrender.com", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -302,7 +302,7 @@ async function loadRooms() {
   const token = localStorage.getItem("token");
 
   try {
-    const res = await fetch("https://your-backend.onrender.com/rooms", {
+    const res = await fetch("https://web-rtc-project-3.onrender.com", {
       headers: {
         "Authorization": "Bearer " + token
       }
@@ -352,7 +352,7 @@ joinRoomBtn.addEventListener("click", async () => {
   const token = localStorage.getItem("token");
 
   try {
-    const res = await fetch("https://your-backend.onrender.com/join-room", {
+    const res = await fetch("https://web-rtc-project-3.onrender.com", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
