@@ -486,13 +486,16 @@ body {
   flex: 1;
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 16px;
 }
 
 #remoteVideo {
-  max-width: 1800px;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   border-radius: 14px;
   background: black;
   object-fit: cover;
@@ -554,7 +557,7 @@ body {
 .meeting-content {
   flex: 1;
   display: flex;
-  position: relative;
+  height: calc(100vh - 56px - 80px);
 }
 
 .chat-sidebar {
@@ -851,3 +854,4 @@ body {
 .game-container .close-game-btn:hover {
   background: #ff4d4d;
 }
+
